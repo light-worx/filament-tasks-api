@@ -3,11 +3,12 @@
 namespace Lightworx\FilamentTasksApi\Resources;
 
 use BackedEnum;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -17,6 +18,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Lightworx\FilamentTasksApi\FilamentTasksApiPlugin;
 use Lightworx\FilamentTasksApi\Models\Task;
 use Lightworx\FilamentTasksApi\Resources\TaskResource\Pages;
@@ -53,8 +55,31 @@ class TaskResource extends Resource
         return 'Tasks';
     }
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Route binding — bypass DB entirely
+    // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Filament calls this (via InteractsWithRecord::resolveRecord) on every
+     * page load AND on every Livewire update POST. The default implementation
+     * runs resolveRouteBindingQuery()->first() which hits the DB.
+     *
+     * We return a shell Task with just the ID. EditTask::mount() fetches the
+     * full data from the API for the initial page render. Subsequent Livewire
+     * POSTs (save, etc.) use the form field data directly via
+     * handleRecordUpdate(), so the shell is sufficient.
+     */
+    public static function resolveRecordRouteBinding(int|string $key, ?Closure $modifyQuery = null): ?Model
+    {
+        $task = new Task();
+        $task->forceFill(['id' => (string) $key]);
+        $task->exists = true;
+
+        return $task;
+    }
+
     // ──────────────────────────────────────────────
-    // Form schema (Create & Edit)
+    // Form schema
     // ──────────────────────────────────────────────
 
     public static function form(Schema $schema): Schema
@@ -82,22 +107,17 @@ class TaskResource extends Resource
                 ->default('pending')
                 ->required(),
 
-            Select::make('priority')
-                ->label('Priority')
-                ->options([
-                    'low'    => 'Low',
-                    'medium' => 'Medium',
-                    'high'   => 'High',
-                ])
-                ->default('medium')
-                ->required(),
-
-            DatePicker::make('due_date')
-                ->label('Due Date'),
-
-            TextInput::make('assigned_to')
-                ->label('Assigned To')
+            TextInput::make('assigned_email')
+                ->label('Assigned To (email)')
+                ->email()
                 ->maxLength(255),
+
+            TextInput::make('project_id')
+                ->label('Project ID')
+                ->maxLength(255),
+
+            DateTimePicker::make('due_at')
+                ->label('Due At'),
         ]);
     }
 
@@ -111,8 +131,8 @@ class TaskResource extends Resource
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
-                    ->sortable()
-                    ->width('60px'),
+                    ->width('80px')
+                    ->copyable(),
 
                 TextColumn::make('title')
                     ->label('Title')
@@ -128,35 +148,23 @@ class TaskResource extends Resource
                         'success' => 'completed',
                         'danger'  => 'cancelled',
                     ])
-                    ->formatStateUsing(fn (string $state) => match ($state) {
+                    ->formatStateUsing(fn (?string $state) => match ($state) {
                         'pending'     => 'Pending',
                         'in_progress' => 'In Progress',
                         'completed'   => 'Completed',
                         'cancelled'   => 'Cancelled',
-                        default       => $state,
+                        default       => $state ?? '—',
                     }),
 
-                TextColumn::make('priority')
-                    ->badge()
-                    ->label('Priority')
-                    ->colors([
-                        'success' => 'low',
-                        'warning' => 'medium',
-                        'danger'  => 'high',
-                    ])
-                    ->formatStateUsing(fn (string $state) => ucfirst($state)),
-
-                TextColumn::make('due_date')
-                    ->label('Due Date')
-                    ->date('d M Y')
-                    ->sortable(),
-
-                TextColumn::make('assigned_to')
+                TextColumn::make('assigned_email')
                     ->label('Assigned To'),
 
-                TextColumn::make('created_at')
-                    ->label('Created')
-                    ->dateTime('d M Y')
+                TextColumn::make('project_id')
+                    ->label('Project'),
+
+                TextColumn::make('due_at')
+                    ->label('Due At')
+                    ->dateTime('d M Y H:i')
                     ->sortable(),
             ])
             ->filters([
@@ -167,13 +175,6 @@ class TaskResource extends Resource
                         'completed'   => 'Completed',
                         'cancelled'   => 'Cancelled',
                     ]),
-
-                SelectFilter::make('priority')
-                    ->options([
-                        'low'    => 'Low',
-                        'medium' => 'Medium',
-                        'high'   => 'High',
-                    ]),
             ])
             ->recordActions([
                 Action::make('complete')
@@ -181,16 +182,20 @@ class TaskResource extends Resource
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->visible(fn (Task $record) => $record->status !== 'completed')
+                    ->requiresConfirmation()
                     ->action(function (Task $record) {
                         try {
-                            app(TasksApiClient::class)->update($record->id, ['status' => 'completed']);
+                            app(TasksApiClient::class)
+                                ->tasks()
+                                ->update($record->id, ['status' => 'completed']);
+
                             Notification::make()
                                 ->title('Task marked as completed.')
                                 ->success()
                                 ->send();
                         } catch (\Throwable $e) {
                             Notification::make()
-                                ->title('Failed to update task: ' . $e->getMessage())
+                                ->title('Failed: ' . $e->getMessage())
                                 ->danger()
                                 ->send();
                         }
@@ -205,26 +210,33 @@ class TaskResource extends Resource
                     ->requiresConfirmation()
                     ->action(function (Task $record) {
                         try {
-                            app(TasksApiClient::class)->delete($record->id);
+                            app(TasksApiClient::class)
+                                ->tasks()
+                                ->delete($record->id);
+
                             Notification::make()
                                 ->title('Task deleted.')
                                 ->success()
                                 ->send();
                         } catch (\Throwable $e) {
                             Notification::make()
-                                ->title('Failed to delete task: ' . $e->getMessage())
+                                ->title('Failed: ' . $e->getMessage())
                                 ->danger()
                                 ->send();
                         }
                     }),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->action(function (\Illuminate\Support\Collection $records) {
-                            $client = app(TasksApiClient::class);
-                            $records->each(fn (Task $record) => $client->delete($record->id));
-                            Notification::make()->title('Selected tasks deleted.')->success()->send();
+                            $query = app(TasksApiClient::class)->tasks();
+                            $records->each(fn (Task $record) => $query->delete($record->id));
+
+                            Notification::make()
+                                ->title('Selected tasks deleted.')
+                                ->success()
+                                ->send();
                         }),
                 ]),
             ])
@@ -234,6 +246,11 @@ class TaskResource extends Resource
     // ──────────────────────────────────────────────
     // Pages
     // ──────────────────────────────────────────────
+
+    public static function getRecordRouteKeyName(): ?string
+    {
+        return 'id';
+    }
 
     public static function getPages(): array
     {

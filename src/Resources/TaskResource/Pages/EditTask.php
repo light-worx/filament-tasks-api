@@ -4,6 +4,7 @@ namespace Lightworx\FilamentTasksApi\Resources\TaskResource\Pages;
 
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
 use Lightworx\FilamentTasksApi\Models\Task;
 use Lightworx\FilamentTasksApi\Resources\TaskResource;
 use Lightworx\TasksApiClient\TasksApiClient;
@@ -13,7 +14,9 @@ class EditTask extends EditRecord
     protected static string $resource = TaskResource::class;
 
     /**
-     * Load the task from the remote API.
+     * Called once on the initial GET. At this point $this->record is already
+     * a shell Task (set by resolveRecordRouteBinding in TaskResource).
+     * We fetch the full data from the API so the form is pre-populated.
      */
     protected function resolveRecord(int|string $key): Task
     {
@@ -21,31 +24,34 @@ class EditTask extends EditRecord
         $client = app(TasksApiClient::class);
 
         try {
-            $response = $client->show($key);
+            $dtos  = $client->tasks()->get();
+            $dto   = collect($dtos)->first(fn ($d) => $d->id === (string) $key);
+
+            if ($dto) {
+                return Task::fromDto($dto);
+            }
         } catch (\Throwable $e) {
             Notification::make()
-                ->title('Task not found: ' . $e->getMessage())
+                ->title('Could not load task: ' . $e->getMessage())
                 ->danger()
                 ->send();
-
-            $this->redirect($this->getResource()::getUrl('index'));
         }
 
-        $data = $response['data'] ?? $response;
+        // Fallback shell — form will be empty but save still works
+        $task = new Task();
+        $task->forceFill(['id' => (string) $key]);
+        $task->exists = true;
 
-        return (new Task())->forceFill($data);
+        return $task;
     }
 
-    /**
-     * Persist changes back to the remote API.
-     */
-    protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): Task
+    protected function handleRecordUpdate(Model $record, array $data): Task
     {
         /** @var TasksApiClient $client */
         $client = app(TasksApiClient::class);
 
         try {
-            $response = $client->update($record->id, $data);
+            $dto = $client->tasks()->update($record->id, $data);
         } catch (\Throwable $e) {
             Notification::make()
                 ->title('Failed to update task: ' . $e->getMessage())
@@ -55,7 +61,7 @@ class EditTask extends EditRecord
             $this->halt();
         }
 
-        return (new Task())->forceFill($response['data'] ?? $response);
+        return Task::fromDto($dto);
     }
 
     protected function getRedirectUrl(): string

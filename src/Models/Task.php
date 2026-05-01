@@ -3,68 +3,113 @@
 namespace Lightworx\FilamentTasksApi\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Wireable;
+use Lightworx\TasksApiClient\DTO\TaskData;
 
 /**
- * A non-persisted Eloquent model used as a value-object so that Filament
- * resources, tables and forms can work with Task data fetched from the
- * remote API via the tasks-api-client SDK without touching a local DB.
+ * Value-object model wrapping a TaskData DTO from the tasks-api-client SDK.
  *
- * @property int|null    $id
+ * Implements Wireable so Livewire serializes/deserializes it as plain data
+ * rather than trying to re-fetch it from the database by key.
+ *
+ * @property string      $id
  * @property string      $title
- * @property string      $description
- * @property string      $status         pending|in_progress|completed|cancelled
- * @property string      $priority       low|medium|high
- * @property string|null $due_date
- * @property string|null $assigned_to
- * @property string|null $created_at
- * @property string|null $updated_at
+ * @property string|null $description
+ * @property string      $assigned_email
+ * @property string|null $status
+ * @property string|null $project_id
+ * @property string|null $due_at
  */
-class Task extends Model
+class Task extends Model implements Wireable
 {
     protected $fillable = [
         'id',
         'title',
         'description',
+        'assigned_email',
         'status',
-        'priority',
-        'due_date',
-        'assigned_to',
-        'created_at',
-        'updated_at',
-    ];
-
-    protected $casts = [
-        'due_date'   => 'date',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'project_id',
+        'due_at',
     ];
 
     public $timestamps = false;
 
     /**
-     * Point at the migrations table — it always exists in every Laravel app.
-     * This lets Filament construct a valid Eloquent Builder during page setup
-     * without a "table not found" error. Actual data always comes from the
-     * API via getTableRecords(), never from this table.
+     * Point at the migrations table so Filament can build a valid Eloquent
+     * Builder without a missing-table error. Never actually queried.
      */
     public function getTable(): string
     {
         return 'migrations';
     }
 
-    /**
-     * The route key used by Filament to build edit/view URLs.
-     */
     public function getRouteKeyName(): string
     {
         return 'id';
     }
 
-    /**
-     * Resolve for route model binding without hitting the DB.
-     */
     public function resolveRouteBinding($value, $field = null): ?static
     {
-        return (new static())->forceFill(['id' => $value]);
+        $instance = new static();
+        $instance->forceFill(['id' => (string) $value]);
+        $instance->exists = true;
+
+        return $instance;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Wireable — Livewire will call toLivewire() to serialize and
+    // fromLivewire() to deserialize, instead of doing an Eloquent DB lookup.
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function toLivewire(): array
+    {
+        return [
+            'id'             => $this->id,
+            'title'          => $this->title,
+            'description'    => $this->description,
+            'assigned_email' => $this->assigned_email,
+            'status'         => $this->status,
+            'project_id'     => $this->project_id,
+            'due_at'         => $this->due_at,
+            'exists'         => $this->exists,
+        ];
+    }
+
+    public static function fromLivewire($value): static
+    {
+        $instance = new static();
+        $instance->forceFill([
+            'id'             => $value['id'] ?? null,
+            'title'          => $value['title'] ?? null,
+            'description'    => $value['description'] ?? null,
+            'assigned_email' => $value['assigned_email'] ?? null,
+            'status'         => $value['status'] ?? null,
+            'project_id'     => $value['project_id'] ?? null,
+            'due_at'         => $value['due_at'] ?? null,
+        ]);
+        $instance->exists = $value['exists'] ?? true;
+
+        return $instance;
+    }
+
+    /**
+     * Hydrate a Task model from a TaskData DTO.
+     */
+    public static function fromDto(TaskData $dto): static
+    {
+        $instance = new static();
+        $instance->forceFill([
+            'id'             => $dto->id,
+            'title'          => $dto->title,
+            'description'    => $dto->description,
+            'assigned_email' => $dto->assigned_email,
+            'status'         => $dto->status,
+            'project_id'     => $dto->project_id,
+            'due_at'         => $dto->due_at,
+        ]);
+        $instance->exists = true;
+
+        return $instance;
     }
 }
