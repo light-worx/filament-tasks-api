@@ -4,7 +4,7 @@ namespace Lightworx\FilamentTasksApi\Widgets;
 
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Lightworx\TasksApiClient\TasksApiClient;
+use Lightworx\TasksApiClient\Facades\TasksApi;
 
 class TaskStatsWidget extends StatsOverviewWidget
 {
@@ -13,13 +13,9 @@ class TaskStatsWidget extends StatsOverviewWidget
     protected function getStats(): array
     {
         try {
-            /** @var TasksApiClient $client */
-            $client = app(TasksApiClient::class);
-
-            $all = $client->tasks()->get(); // returns TaskData[]
-
-            $counts = collect($all)->countBy(fn ($dto) => $dto->status ?? 'unknown');
-
+            $all      = TasksApi::tasks()->get();         // TaskData[]
+            $counts   = collect($all)->countBy(fn ($dto) => $dto->status ?? 'unknown');
+            $statuses = TasksApi::meta()->statusOptions(); // ['pending' => 'Pending', ...]
         } catch (\Throwable) {
             return [
                 Stat::make('Tasks', 'Unavailable')
@@ -28,22 +24,18 @@ class TaskStatsWidget extends StatsOverviewWidget
             ];
         }
 
-        return [
-            Stat::make('Pending', $counts->get('pending', 0))
-                ->color('warning')
-                ->icon('heroicon-o-clock'),
-
-            Stat::make('In Progress', $counts->get('in_progress', 0))
-                ->color('primary')
-                ->icon('heroicon-o-arrow-path'),
-
-            Stat::make('Completed', $counts->get('completed', 0))
-                ->color('success')
-                ->icon('heroicon-o-check-circle'),
-
-            Stat::make('Cancelled', $counts->get('cancelled', 0))
-                ->color('danger')
-                ->icon('heroicon-o-x-circle'),
+        $colorMap = [
+            'pending'     => 'warning',
+            'in_progress' => 'primary',
+            'completed'   => 'success',
+            'cancelled'   => 'danger',
         ];
+
+        return collect($statuses)
+            ->map(fn (string $label, string $id) => Stat::make($label, $counts->get($id, 0))
+                ->color($colorMap[$id] ?? 'gray')
+            )
+            ->values()
+            ->all();
     }
 }

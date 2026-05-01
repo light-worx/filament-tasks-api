@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
 use Lightworx\FilamentTasksApi\FilamentTasksApiPlugin;
 use Lightworx\FilamentTasksApi\Models\Task;
 use Lightworx\FilamentTasksApi\Resources\TaskResource\Pages;
+use Lightworx\TasksApiClient\Facades\TasksApi;
 use Lightworx\TasksApiClient\TasksApiClient;
 
 class TaskResource extends Resource
@@ -29,6 +30,11 @@ class TaskResource extends Resource
     protected static ?string $model = Task::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return FilamentTasksApiPlugin::get()->getNavigationGroup();
+    }
 
     public static function getNavigationSort(): ?int
     {
@@ -50,6 +56,10 @@ class TaskResource extends Resource
         return 'Tasks';
     }
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Route binding — bypass DB entirely
+    // ──────────────────────────────────────────────────────────────────────
+
     public static function resolveRecordRouteBinding(int|string $key, ?Closure $modifyQuery = null): ?Model
     {
         $task = new Task();
@@ -58,6 +68,10 @@ class TaskResource extends Resource
 
         return $task;
     }
+
+    // ──────────────────────────────────────────────
+    // Form schema
+    // ──────────────────────────────────────────────
 
     public static function form(Schema $schema): Schema
     {
@@ -75,12 +89,7 @@ class TaskResource extends Resource
 
             Select::make('status')
                 ->label('Status')
-                ->options([
-                    'pending'     => 'Pending',
-                    'in_progress' => 'In Progress',
-                    'completed'   => 'Completed',
-                    'cancelled'   => 'Cancelled',
-                ])
+                ->options(fn () => TasksApi::meta()->statusOptions())
                 ->default('pending')
                 ->required(),
 
@@ -97,6 +106,10 @@ class TaskResource extends Resource
                 ->label('Due At'),
         ]);
     }
+
+    // ──────────────────────────────────────────────
+    // Table schema
+    // ──────────────────────────────────────────────
 
     public static function table(Table $table): Table
     {
@@ -115,18 +128,20 @@ class TaskResource extends Resource
                 TextColumn::make('status')
                     ->badge()
                     ->label('Status')
-                    ->colors([
-                        'warning' => 'pending',
-                        'primary' => 'in_progress',
-                        'success' => 'completed',
-                        'danger'  => 'cancelled',
-                    ])
-                    ->formatStateUsing(fn (?string $state) => match ($state) {
-                        'pending'     => 'Pending',
-                        'in_progress' => 'In Progress',
-                        'completed'   => 'Completed',
-                        'cancelled'   => 'Cancelled',
-                        default       => $state ?? '—',
+                    ->color(fn (?string $state) => match ($state) {
+                        'pending'     => 'warning',
+                        'in_progress' => 'primary',
+                        'completed'   => 'success',
+                        'cancelled'   => 'danger',
+                        default       => 'gray',
+                    })
+                    ->formatStateUsing(function (?string $state): string {
+                        try {
+                            $options = TasksApi::meta()->statusOptions();
+                            return $options[$state] ?? $state ?? '—';
+                        } catch (\Throwable) {
+                            return $state ?? '—';
+                        }
                     }),
 
                 TextColumn::make('assigned_email')
@@ -142,12 +157,7 @@ class TaskResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('status')
-                    ->options([
-                        'pending'     => 'Pending',
-                        'in_progress' => 'In Progress',
-                        'completed'   => 'Completed',
-                        'cancelled'   => 'Cancelled',
-                    ]),
+                    ->options(fn () => TasksApi::meta()->statusOptions()),
             ])
             ->recordActions([
                 Action::make('complete')
@@ -215,6 +225,10 @@ class TaskResource extends Resource
             ])
             ->poll('30s');
     }
+
+    // ──────────────────────────────────────────────
+    // Pages
+    // ──────────────────────────────────────────────
 
     public static function getRecordRouteKeyName(): ?string
     {
