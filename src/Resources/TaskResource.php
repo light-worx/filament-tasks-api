@@ -30,11 +30,6 @@ class TaskResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    public static function getNavigationGroup(): ?string
-    {
-        return FilamentTasksApiPlugin::get()->getNavigationGroup();
-    }
-
     public static function getNavigationSort(): ?int
     {
         return FilamentTasksApiPlugin::get()->getNavigationSort();
@@ -55,20 +50,6 @@ class TaskResource extends Resource
         return 'Tasks';
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Route binding — bypass DB entirely
-    // ──────────────────────────────────────────────────────────────────────
-
-    /**
-     * Filament calls this (via InteractsWithRecord::resolveRecord) on every
-     * page load AND on every Livewire update POST. The default implementation
-     * runs resolveRouteBindingQuery()->first() which hits the DB.
-     *
-     * We return a shell Task with just the ID. EditTask::mount() fetches the
-     * full data from the API for the initial page render. Subsequent Livewire
-     * POSTs (save, etc.) use the form field data directly via
-     * handleRecordUpdate(), so the shell is sufficient.
-     */
     public static function resolveRecordRouteBinding(int|string $key, ?Closure $modifyQuery = null): ?Model
     {
         $task = new Task();
@@ -77,10 +58,6 @@ class TaskResource extends Resource
 
         return $task;
     }
-
-    // ──────────────────────────────────────────────
-    // Form schema
-    // ──────────────────────────────────────────────
 
     public static function form(Schema $schema): Schema
     {
@@ -120,10 +97,6 @@ class TaskResource extends Resource
                 ->label('Due At'),
         ]);
     }
-
-    // ──────────────────────────────────────────────
-    // Table schema
-    // ──────────────────────────────────────────────
 
     public static function table(Table $table): Table
     {
@@ -242,10 +215,6 @@ class TaskResource extends Resource
             ])
             ->poll('30s');
     }
-
-    // ──────────────────────────────────────────────
-    // Pages
-    // ──────────────────────────────────────────────
 
     public static function getRecordRouteKeyName(): ?string
     {
