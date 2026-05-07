@@ -22,7 +22,7 @@ All CRUD operations talk directly to the remote Tasks API — no local database 
 ### 1. Require the package
 
 ```bash
-composer require light-worx/filament-tasks-api
+composer require light-worx/filament-tasks
 ```
 
 Because the SDK (`light-worx/tasks-api-client`) is not yet published to Packagist
