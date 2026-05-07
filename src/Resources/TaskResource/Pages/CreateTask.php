@@ -1,11 +1,11 @@
 <?php
 
-namespace Lightworx\FilamentTasksApi\Resources\TaskResource\Pages;
+namespace Lightworx\FilamentTasks\Resources\TaskResource\Pages;
 
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
-use Lightworx\FilamentTasksApi\Models\Task;
-use Lightworx\FilamentTasksApi\Resources\TaskResource;
+use Lightworx\FilamentTasks\Models\Task;
+use Lightworx\FilamentTasks\Resources\TaskResource;
 use Lightworx\TasksApiClient\TasksApiClient;
 
 class CreateTask extends CreateRecord

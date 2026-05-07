@@ -1,6 +1,6 @@
 <?php
 
-namespace Lightworx\FilamentTasksApi\Models;
+namespace Lightworx\FilamentTasks\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Wireable;

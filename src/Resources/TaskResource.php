@@ -1,6 +1,6 @@
 <?php
 
-namespace Lightworx\FilamentTasksApi\Resources;
+namespace Lightworx\FilamentTasks\Resources;
 
 use BackedEnum;
 use Closure;
@@ -19,9 +19,9 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
-use Lightworx\FilamentTasksApi\FilamentTasksApiPlugin;
-use Lightworx\FilamentTasksApi\Models\Task;
-use Lightworx\FilamentTasksApi\Resources\TaskResource\Pages;
+use Lightworx\FilamentTasks\FilamentTasksPlugin;
+use Lightworx\FilamentTasks\Models\Task;
+use Lightworx\FilamentTasks\Resources\TaskResource\Pages;
 use Lightworx\TasksApiClient\Facades\TasksApi;
 use Lightworx\TasksApiClient\TasksApiClient;
 
@@ -33,12 +33,12 @@ class TaskResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return FilamentTasksApiPlugin::get()->getNavigationGroup();
+        return FilamentTasksPlugin::get()->getNavigationGroup();
     }
 
     public static function getNavigationSort(): ?int
     {
-        return FilamentTasksApiPlugin::get()->getNavigationSort();
+        return FilamentTasksPlugin::get()->getNavigationSort();
     }
 
     public static function getNavigationLabel(): string

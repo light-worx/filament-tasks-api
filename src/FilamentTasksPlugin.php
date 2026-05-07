@@ -1,13 +1,13 @@
 <?php
 
-namespace Lightworx\FilamentTasksApi;
+namespace Lightworx\FilamentTasks;
 
 use Filament\Contracts\Plugin;
 use Filament\Panel;
-use Lightworx\FilamentTasksApi\Resources\TaskResource;
-use Lightworx\FilamentTasksApi\Widgets\TaskStatsWidget;
+use Lightworx\FilamentTasks\Resources\TaskResource;
+use Lightworx\FilamentTasks\Widgets\TaskStatsWidget;
 
-class FilamentTasksApiPlugin implements Plugin
+class FilamentTasksPlugin implements Plugin
 {
     protected string $navigationGroup = '';
     protected ?int $navigationSort = null;
@@ -20,7 +20,7 @@ class FilamentTasksApiPlugin implements Plugin
 
     public function getId(): string
     {
-        return 'filament-tasks-api';
+        return 'filament-tasks';
     }
 
     public function register(Panel $panel): void
@@ -61,7 +61,7 @@ class FilamentTasksApiPlugin implements Plugin
 
     public function getNavigationGroup(): string
     {
-        return $this->navigationGroup ?: config('filament-tasks-api.navigation_group', 'Task Management');
+        return $this->navigationGroup ?: config('filament-tasks.navigation_group', 'Task Management');
     }
 
     public function navigationSort(int $sort): static
@@ -73,7 +73,7 @@ class FilamentTasksApiPlugin implements Plugin
 
     public function getNavigationSort(): int
     {
-        return $this->navigationSort ?? (int) config('filament-tasks-api.navigation_sort', 10);
+        return $this->navigationSort ?? (int) config('filament-tasks.navigation_sort', 10);
     }
 
     // ──────────────────────────────────────────────
@@ -83,7 +83,7 @@ class FilamentTasksApiPlugin implements Plugin
     public static function get(): static
     {
         /** @var static $plugin */
-        $plugin = filament('filament-tasks-api');
+        $plugin = filament('filament-tasks');
 
         return $plugin;
     }

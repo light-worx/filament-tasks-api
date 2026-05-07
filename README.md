@@ -36,7 +36,7 @@ you may need to add both repos as VCS sources in your `composer.json`:
     },
     {
         "type": "vcs",
-        "url": "https://github.com/light-worx/filament-tasks-api"
+        "url": "https://github.com/light-worx/filament-tasks"
     }
 ]
 ```
@@ -44,7 +44,7 @@ you may need to add both repos as VCS sources in your `composer.json`:
 ### 2. Publish & configure
 
 ```bash
-php artisan vendor:publish --tag=filament-tasks-api-config
+php artisan vendor:publish --tag=filament-tasks-config
 ```
 
 Add the following to your `.env`:
@@ -64,14 +64,14 @@ TASKS_NAV_GROUP="Task Management"
 Register the plugin inside your **Filament Panel Provider** (e.g. `app/Providers/Filament/AdminPanelProvider.php`):
 
 ```php
-use Lightworx\FilamentTasksApi\FilamentTasksApiPlugin;
+use Lightworx\FilamentTasks\FilamentTasksPlugin;
 
 public function panel(Panel $panel): Panel
 {
     return $panel
         // ... your other panel config
         ->plugins([
-            FilamentTasksApiPlugin::make()
+            FilamentTasksPlugin::make()
                 // optional — override the sidebar group label
                 ->navigationGroup('My Tasks')
                 // optional — show summary stats on the dashboard
@@ -121,7 +121,7 @@ The plugin does **not** use Eloquent or any local database. Instead:
 4. `EditTask::handleRecordUpdate()` calls `TasksClient::update()`.
 5. Delete actions call `TasksClient::delete()`.
 
-All SDK calls respect the `base_url` and `token` you set in `config/filament-tasks-api.php`
+All SDK calls respect the `base_url` and `token` you set in `config/filament-tasks.php`
 (or `.env`).
 
 ---
@@ -129,7 +129,7 @@ All SDK calls respect the `base_url` and `token` you set in `config/filament-tas
 ## Configuration reference
 
 ```php
-// config/filament-tasks-api.php
+// config/filament-tasks.php
 
 return [
     'base_url'         => env('TASKS_API_URL', 'http://localhost:8000/api'),
@@ -164,7 +164,7 @@ or returned as a plain array — both formats are handled automatically.
 ### Custom navigation
 
 ```php
-FilamentTasksApiPlugin::make()
+FilamentTasksPlugin::make()
     ->navigationGroup('Operations')
     ->navigationSort(5)
 ```
@@ -173,7 +173,7 @@ FilamentTasksApiPlugin::make()
 
 ```php
 // app/Filament/Resources/TaskResource/Pages/ListTasks.php
-use Lightworx\FilamentTasksApi\Resources\TaskResource\Pages\ListTasks as BaseListTasks;
+use Lightworx\FilamentTasks\Resources\TaskResource\Pages\ListTasks as BaseListTasks;
 
 class ListTasks extends BaseListTasks
 {

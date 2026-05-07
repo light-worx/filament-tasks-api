@@ -1,6 +1,6 @@
 <?php
 
-namespace Lightworx\FilamentTasksApi\Resources\TaskResource\Pages;
+namespace Lightworx\FilamentTasks\Resources\TaskResource\Pages;
 
 use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
@@ -8,8 +8,8 @@ use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Lightworx\FilamentTasksApi\Models\Task;
-use Lightworx\FilamentTasksApi\Resources\TaskResource;
+use Lightworx\FilamentTasks\Models\Task;
+use Lightworx\FilamentTasks\Resources\TaskResource;
 use Lightworx\TasksApiClient\TasksApiClient;
 
 class ListTasks extends ListRecords

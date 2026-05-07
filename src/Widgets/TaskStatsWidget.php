@@ -1,6 +1,6 @@
 <?php
 
-namespace Lightworx\FilamentTasksApi\Widgets;
+namespace Lightworx\FilamentTasks\Widgets;
 
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;

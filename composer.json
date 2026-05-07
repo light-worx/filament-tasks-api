@@ -11,13 +11,13 @@
     },
     "autoload": {
         "psr-4": {
-            "Lightworx\\FilamentTasksApi\\": "src/"
+            "Lightworx\\FilamentTasks\\": "src/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Lightworx\\FilamentTasksApi\\FilamentTasksApiServiceProvider"
+                "Lightworx\\FilamentTasks\\FilamentTasksServiceProvider"
             ]
         }
     }
