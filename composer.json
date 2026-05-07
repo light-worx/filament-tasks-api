@@ -1,5 +1,5 @@
 {
-    "name": "light-worx/filament-tasks-api",
+    "name": "light-worx/filament-tasks",
     "description": "Filament 5 plugin for interacting with the remote Tasks API via the tasks-api-client SDK",
     "type": "library",
     "license": "MIT",
