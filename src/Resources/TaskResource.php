@@ -15,6 +15,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Colors\Color;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -112,10 +113,6 @@ class TaskResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('id')
-                    ->label('ID')
-                    ->width('80px')
-                    ->copyable(),
 
                 TextColumn::make('title')
                     ->label('Title')
@@ -125,7 +122,7 @@ class TaskResource extends Resource
                 TextColumn::make('status')
                     ->badge()
                     ->label('Status')
-                    ->color(fn (?string $state) => StatusHelper::badgeColour($state))
+                    ->color(function ($state) { return Color::hex(StatusHelper::badgeColour($state)); })
                     ->formatStateUsing(fn (?string $state) => StatusHelper::label($state)),
 
                 TextColumn::make('project_id')
