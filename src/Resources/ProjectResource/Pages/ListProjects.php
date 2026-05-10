@@ -1,6 +1,6 @@
 <?php
 
-namespace Lightworx\FilamentTasks\Resources\TaskResource\Pages;
+namespace Lightworx\FilamentTasks\Resources\ProjectResource\Pages;
 
 use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
@@ -8,13 +8,13 @@ use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Lightworx\FilamentTasks\Models\Task;
-use Lightworx\FilamentTasks\Resources\TaskResource;
+use Lightworx\FilamentTasks\Models\Project;
+use Lightworx\FilamentTasks\Resources\ProjectResource;
 use Lightworx\TasksApiClient\Facades\TasksApi;
 
-class ListTasks extends ListRecords
+class ListProjects extends ListRecords
 {
-    protected static string $resource = TaskResource::class;
+    protected static string $resource = ProjectResource::class;
 
     protected ?LengthAwarePaginator $apiPaginator = null;
 
@@ -25,7 +25,7 @@ class ListTasks extends ListRecords
 
     protected function getTableQuery(): Builder
     {
-        return Task::query()->whereRaw('1 = 0');
+        return Project::query()->whereRaw('1 = 0');
     }
 
     public function getTableRecords(): \Illuminate\Contracts\Pagination\LengthAwarePaginator|Collection
@@ -34,28 +34,21 @@ class ListTasks extends ListRecords
             return $this->apiPaginator;
         }
 
-        $perPage      = $this->getTableRecordsPerPage();
-        $page         = max(1, $this->getPage());
-        $tableFilters = $this->getTableFilters();
+        $perPage = $this->getTableRecordsPerPage();
+        $page    = max(1, $this->getPage());
 
         try {
-            $query = TasksApi::tasks()->latest();
-
-            if ($status = $tableFilters['status']['value'] ?? null) {
-                $query->whereStatus($status);
-            }
-
-            $result = $query->paginate($perPage);
+            $result = TasksApi::projects()->paginate($perPage);
         } catch (\Throwable $e) {
             Notification::make()
-                ->title('Could not load tasks: ' . $e->getMessage())
+                ->title('Could not load projects: ' . $e->getMessage())
                 ->danger()
                 ->send();
             $this->apiPaginator = new LengthAwarePaginator([], 0, $perPage, $page);
             return $this->apiPaginator;
         }
 
-        $items = collect($result['data'])->map(fn ($dto) => Task::fromDto($dto));
+        $items = collect($result['data'])->map(fn ($dto) => Project::fromDto($dto));
         $meta  = $result['meta'] ?? [];
 
         $this->apiPaginator = new LengthAwarePaginator(

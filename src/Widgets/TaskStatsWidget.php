@@ -4,6 +4,7 @@ namespace Lightworx\FilamentTasks\Widgets;
 
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Lightworx\FilamentTasks\Support\StatusHelper;
 use Lightworx\TasksApiClient\Facades\TasksApi;
 
 class TaskStatsWidget extends StatsOverviewWidget
@@ -13,9 +14,9 @@ class TaskStatsWidget extends StatsOverviewWidget
     protected function getStats(): array
     {
         try {
-            $all      = TasksApi::tasks()->get();         // TaskData[]
-            $counts   = collect($all)->countBy(fn ($dto) => $dto->status ?? 'unknown');
-            $statuses = TasksApi::meta()->statusOptions(); // ['pending' => 'Pending', ...]
+            $counts   = collect(TasksApi::tasks()->get())
+                ->countBy(fn ($dto) => $dto->status ?? 'unknown');
+            $statuses = StatusHelper::all(); // indexed by id, includes colour
         } catch (\Throwable) {
             return [
                 Stat::make('Tasks', 'Unavailable')
@@ -24,17 +25,13 @@ class TaskStatsWidget extends StatsOverviewWidget
             ];
         }
 
-        $colorMap = [
-            'pending'     => 'warning',
-            'in_progress' => 'primary',
-            'completed'   => 'success',
-            'cancelled'   => 'danger',
-        ];
-
         return collect($statuses)
-            ->map(fn (string $label, string $id) => Stat::make($label, $counts->get($id, 0))
-                ->color($colorMap[$id] ?? 'gray')
-            )
+            ->filter(fn ($s) => ($s['is_active'] ?? true))
+            ->sortBy('sort_order')
+            ->map(fn ($s) => Stat::make(
+                $s['label'],
+                $counts->get($s['id'], 0)
+            )->color($s['colour'] ?? 'gray'))
             ->values()
             ->all();
     }

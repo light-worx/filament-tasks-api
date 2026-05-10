@@ -6,61 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 use Livewire\Wireable;
 use Lightworx\TasksApiClient\DTO\TaskData;
 
-/**
- * Value-object model wrapping a TaskData DTO from the tasks-api-client SDK.
- *
- * Implements Wireable so Livewire serializes/deserializes it as plain data
- * rather than trying to re-fetch it from the database by key.
- *
- * @property string      $id
- * @property string      $title
- * @property string|null $description
- * @property string      $assigned_email
- * @property string|null $status
- * @property string|null $project_id
- * @property string|null $due_at
- */
 class Task extends Model implements Wireable
 {
     protected $fillable = [
-        'id',
-        'title',
-        'description',
-        'assigned_email',
-        'status',
-        'project_id',
-        'due_at',
+        'id', 'title', 'description',
+        'assigned_email', 'status', 'project_id', 'due_at',
     ];
 
     public $timestamps = false;
 
-    /**
-     * Point at the migrations table so Filament can build a valid Eloquent
-     * Builder without a missing-table error. Never actually queried.
-     */
-    public function getTable(): string
-    {
-        return 'migrations';
-    }
-
-    public function getRouteKeyName(): string
-    {
-        return 'id';
-    }
+    public function getTable(): string { return 'migrations'; }
+    public function getRouteKeyName(): string { return 'id'; }
 
     public function resolveRouteBinding($value, $field = null): ?static
     {
-        $instance = new static();
-        $instance->forceFill(['id' => (string) $value]);
-        $instance->exists = true;
-
-        return $instance;
+        return (new static())->forceFill(['id' => (string) $value])
+            ->tap(fn ($i) => $i->exists = true);
     }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Wireable — Livewire will call toLivewire() to serialize and
-    // fromLivewire() to deserialize, instead of doing an Eloquent DB lookup.
-    // ──────────────────────────────────────────────────────────────────────
 
     public function toLivewire(): array
     {
@@ -89,13 +51,9 @@ class Task extends Model implements Wireable
             'due_at'         => $value['due_at'] ?? null,
         ]);
         $instance->exists = $value['exists'] ?? true;
-
         return $instance;
     }
 
-    /**
-     * Hydrate a Task model from a TaskData DTO.
-     */
     public static function fromDto(TaskData $dto): static
     {
         $instance = new static();
@@ -109,7 +67,6 @@ class Task extends Model implements Wireable
             'due_at'         => $dto->due_at,
         ]);
         $instance->exists = true;
-
         return $instance;
     }
 }

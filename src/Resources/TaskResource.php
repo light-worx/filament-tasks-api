@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
 use Lightworx\FilamentTasks\FilamentTasksPlugin;
 use Lightworx\FilamentTasks\Models\Task;
 use Lightworx\FilamentTasks\Resources\TaskResource\Pages;
+use Lightworx\FilamentTasks\Support\StatusHelper;
 use Lightworx\TasksApiClient\Facades\TasksApi;
 use Lightworx\TasksApiClient\TasksApiClient;
 
@@ -41,23 +42,12 @@ class TaskResource extends Resource
         return FilamentTasksPlugin::get()->getNavigationSort();
     }
 
-    public static function getNavigationLabel(): string
-    {
-        return 'Tasks';
-    }
-
-    public static function getModelLabel(): string
-    {
-        return 'Task';
-    }
-
-    public static function getPluralModelLabel(): string
-    {
-        return 'Tasks';
-    }
+    public static function getNavigationLabel(): string { return 'Tasks'; }
+    public static function getModelLabel(): string { return 'Task'; }
+    public static function getPluralModelLabel(): string { return 'Tasks'; }
 
     // ──────────────────────────────────────────────────────────────────────
-    // Route binding — bypass DB entirely
+    // Route binding — return a shell Task; no DB lookup
     // ──────────────────────────────────────────────────────────────────────
 
     public static function resolveRecordRouteBinding(int|string $key, ?Closure $modifyQuery = null): ?Model
@@ -65,12 +55,11 @@ class TaskResource extends Resource
         $task = new Task();
         $task->forceFill(['id' => (string) $key]);
         $task->exists = true;
-
         return $task;
     }
 
     // ──────────────────────────────────────────────
-    // Form schema
+    // Form
     // ──────────────────────────────────────────────
 
     public static function form(Schema $schema): Schema
@@ -87,19 +76,27 @@ class TaskResource extends Resource
                 ->rows(3)
                 ->columnSpanFull(),
 
+            // Status: options AND the label for the current value both come
+            // from the API. getOptionLabelUsing() ensures the selected label
+            // is resolved even when options are loaded lazily.
             Select::make('status')
                 ->label('Status')
-                ->options(fn () => TasksApi::meta()->statusOptions())
-                ->default('pending')
+                ->options(fn () => StatusHelper::options())
+                ->getOptionLabelUsing(fn (?string $value) => StatusHelper::label($value))
                 ->required(),
+
+            // Project: searchable Select with explicit label resolver so the
+            // current project name is shown rather than the raw id.
+            Select::make('project_id')
+                ->label('Project')
+                ->options(fn () => StatusHelper::projectOptions())
+                ->getOptionLabelUsing(fn (?string $value) => StatusHelper::projectLabel($value))
+                ->searchable()
+                ->nullable(),
 
             TextInput::make('assigned_email')
                 ->label('Assigned To (email)')
                 ->email()
-                ->maxLength(255),
-
-            TextInput::make('project_id')
-                ->label('Project ID')
                 ->maxLength(255),
 
             DateTimePicker::make('due_at')
@@ -108,7 +105,7 @@ class TaskResource extends Resource
     }
 
     // ──────────────────────────────────────────────
-    // Table schema
+    // Table
     // ──────────────────────────────────────────────
 
     public static function table(Table $table): Table
@@ -128,27 +125,15 @@ class TaskResource extends Resource
                 TextColumn::make('status')
                     ->badge()
                     ->label('Status')
-                    ->color(fn (?string $state) => match ($state) {
-                        'pending'     => 'warning',
-                        'in_progress' => 'primary',
-                        'completed'   => 'success',
-                        'cancelled'   => 'danger',
-                        default       => 'gray',
-                    })
-                    ->formatStateUsing(function (?string $state): string {
-                        try {
-                            $options = TasksApi::meta()->statusOptions();
-                            return $options[$state] ?? $state ?? '—';
-                        } catch (\Throwable) {
-                            return $state ?? '—';
-                        }
-                    }),
+                    ->color(fn (?string $state) => StatusHelper::badgeColour($state))
+                    ->formatStateUsing(fn (?string $state) => StatusHelper::label($state)),
+
+                TextColumn::make('project_id')
+                    ->label('Project')
+                    ->formatStateUsing(fn (?string $state) => StatusHelper::projectLabel($state)),
 
                 TextColumn::make('assigned_email')
                     ->label('Assigned To'),
-
-                TextColumn::make('project_id')
-                    ->label('Project'),
 
                 TextColumn::make('due_at')
                     ->label('Due At')
@@ -157,30 +142,31 @@ class TaskResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('status')
-                    ->options(fn () => TasksApi::meta()->statusOptions()),
+                    ->options(fn () => StatusHelper::options()),
             ])
             ->recordActions([
                 Action::make('complete')
                     ->label('Complete')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(fn (Task $record) => $record->status !== 'completed')
+                    ->visible(function (Task $record) {
+                        $completeId = static::completeStatusId();
+                        return $completeId && $record->status !== $completeId;
+                    })
                     ->requiresConfirmation()
                     ->action(function (Task $record) {
+                        $completeId = static::completeStatusId();
+                        if (! $completeId) {
+                            Notification::make()->title('No "completed" status found in API.')->warning()->send();
+                            return;
+                        }
                         try {
                             app(TasksApiClient::class)
                                 ->tasks()
-                                ->update($record->id, ['status' => 'completed']);
-
-                            Notification::make()
-                                ->title('Task marked as completed.')
-                                ->success()
-                                ->send();
+                                ->update($record->id, ['status' => $completeId]);
+                            Notification::make()->title('Task marked as completed.')->success()->send();
                         } catch (\Throwable $e) {
-                            Notification::make()
-                                ->title('Failed: ' . $e->getMessage())
-                                ->danger()
-                                ->send();
+                            Notification::make()->title('Failed: ' . $e->getMessage())->danger()->send();
                         }
                     }),
 
@@ -193,19 +179,10 @@ class TaskResource extends Resource
                     ->requiresConfirmation()
                     ->action(function (Task $record) {
                         try {
-                            app(TasksApiClient::class)
-                                ->tasks()
-                                ->delete($record->id);
-
-                            Notification::make()
-                                ->title('Task deleted.')
-                                ->success()
-                                ->send();
+                            app(TasksApiClient::class)->tasks()->delete($record->id);
+                            Notification::make()->title('Task deleted.')->success()->send();
                         } catch (\Throwable $e) {
-                            Notification::make()
-                                ->title('Failed: ' . $e->getMessage())
-                                ->danger()
-                                ->send();
+                            Notification::make()->title('Failed: ' . $e->getMessage())->danger()->send();
                         }
                     }),
             ])
@@ -213,27 +190,22 @@ class TaskResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->action(function (\Illuminate\Support\Collection $records) {
-                            $query = app(TasksApiClient::class)->tasks();
-                            $records->each(fn (Task $record) => $query->delete($record->id));
-
-                            Notification::make()
-                                ->title('Selected tasks deleted.')
-                                ->success()
-                                ->send();
+                            $tasks = app(TasksApiClient::class)->tasks();
+                            $records->each(fn (Task $r) => $tasks->delete($r->id));
+                            Notification::make()->title('Selected tasks deleted.')->success()->send();
                         }),
                 ]),
             ])
             ->poll('30s');
     }
 
-    // ──────────────────────────────────────────────
-    // Pages
-    // ──────────────────────────────────────────────
-
-    public static function getRecordRouteKeyName(): ?string
+    protected static function completeStatusId(): ?string
     {
-        return 'id';
+        return collect(StatusHelper::all())
+            ->first(fn ($s) => str_contains(strtolower($s['label'] ?? ''), 'complet'))['id'] ?? null;
     }
+
+    public static function getRecordRouteKeyName(): ?string { return 'id'; }
 
     public static function getPages(): array
     {

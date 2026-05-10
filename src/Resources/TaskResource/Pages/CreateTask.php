@@ -6,7 +6,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Lightworx\FilamentTasks\Models\Task;
 use Lightworx\FilamentTasks\Resources\TaskResource;
-use Lightworx\TasksApiClient\TasksApiClient;
+use Lightworx\TasksApiClient\Facades\TasksApi;
 
 class CreateTask extends CreateRecord
 {
@@ -14,21 +14,15 @@ class CreateTask extends CreateRecord
 
     protected function handleRecordCreation(array $data): Task
     {
-        /** @var TasksApiClient $client */
-        $client = app(TasksApiClient::class);
-
         try {
-            $dto = $client->tasks()->create($data);
+            return Task::fromDto(TasksApi::tasks()->create($data));
         } catch (\Throwable $e) {
             Notification::make()
                 ->title('Failed to create task: ' . $e->getMessage())
                 ->danger()
                 ->send();
-
             $this->halt();
         }
-
-        return Task::fromDto($dto);
     }
 
     protected function getRedirectUrl(): string
