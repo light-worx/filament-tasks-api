@@ -2,6 +2,7 @@
 
 namespace Lightworx\FilamentTasks\Resources\TaskResource\Pages;
 
+use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -10,7 +11,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Lightworx\FilamentTasks\Models\Task;
 use Lightworx\FilamentTasks\Resources\TaskResource;
-use Lightworx\TasksApiClient\Facades\TasksApi;
+use Lightworx\FilamentTasks\Support\TaskCache;
 
 class ListTasks extends ListRecords
 {
@@ -20,7 +21,26 @@ class ListTasks extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()];
+        return [
+            Action::make('refresh')
+                ->label('Refresh')
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->action(function () {
+                    $perPage      = $this->getTableRecordsPerPage();
+                    $page         = max(1, $this->getPage());
+                    $tableFilters = $this->getTableFilters();
+                    $status       = $tableFilters['status']['value'] ?? null;
+
+                    $this->apiPaginator = null; // clear cached paginator for this request
+
+                    TaskCache::refreshTasks($page, $perPage, $status ?: null);
+
+                    Notification::make()->title('Tasks refreshed.')->success()->send();
+                }),
+
+            CreateAction::make(),
+        ];
     }
 
     protected function getTableQuery(): Builder
@@ -37,15 +57,10 @@ class ListTasks extends ListRecords
         $perPage      = $this->getTableRecordsPerPage();
         $page         = max(1, $this->getPage());
         $tableFilters = $this->getTableFilters();
+        $status       = $tableFilters['status']['value'] ?? null;
 
         try {
-            $query = TasksApi::tasks()->latest();
-
-            if ($status = $tableFilters['status']['value'] ?? null) {
-                $query->whereStatus($status);
-            }
-
-            $result = $query->paginate($perPage);
+            $result = TaskCache::tasks($page, $perPage, $status ?: null);
         } catch (\Throwable $e) {
             Notification::make()
                 ->title('Could not load tasks: ' . $e->getMessage())

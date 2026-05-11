@@ -76,6 +76,25 @@ class FilamentTasksPlugin implements Plugin
         return $this->navigationSort ?? (int) config('filament-tasks.navigation_sort', 10);
     }
 
+    /**
+     * The email address to scope all task queries to.
+     * Required if the API client does not have can_view_all_tasks.
+     */
+    public function getAssignedEmail(): ?string
+    {
+        $email = config('filament-tasks.assigned_email', '');
+        return filled($email) ? $email : null;
+    }
+
+    /**
+     * Owner email for unlocking private project visibility.
+     */
+    public function getOwnerEmail(): ?string
+    {
+        $email = config('filament-tasks.owner_email', '');
+        return filled($email) ? $email : null;
+    }
+
     public static function get(): static
     {
         /** @var static $plugin */

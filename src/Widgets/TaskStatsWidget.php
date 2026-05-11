@@ -5,7 +5,7 @@ namespace Lightworx\FilamentTasks\Widgets;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Lightworx\FilamentTasks\Support\StatusHelper;
-use Lightworx\TasksApiClient\Facades\TasksApi;
+use Lightworx\FilamentTasks\Support\TaskCache;
 
 class TaskStatsWidget extends StatsOverviewWidget
 {
@@ -14,9 +14,9 @@ class TaskStatsWidget extends StatsOverviewWidget
     protected function getStats(): array
     {
         try {
-            $counts   = collect(TasksApi::tasks()->get())
+            $counts   = collect(TaskCache::stats())
                 ->countBy(fn ($dto) => $dto->status ?? 'unknown');
-            $statuses = StatusHelper::all(); // indexed by id, includes colour
+            $statuses = StatusHelper::all();
         } catch (\Throwable) {
             return [
                 Stat::make('Tasks', 'Unavailable')
@@ -28,10 +28,8 @@ class TaskStatsWidget extends StatsOverviewWidget
         return collect($statuses)
             ->filter(fn ($s) => ($s['is_active'] ?? true))
             ->sortBy('sort_order')
-            ->map(fn ($s) => Stat::make(
-                $s['label'],
-                $counts->get($s['id'], 0)
-            )->color($s['colour'] ?? 'gray'))
+            ->map(fn ($s) => Stat::make($s['label'], $counts->get($s['label'], 0))
+                ->color($s['colour'] ?? 'gray'))
             ->values()
             ->all();
     }

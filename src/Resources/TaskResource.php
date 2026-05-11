@@ -24,7 +24,7 @@ use Lightworx\FilamentTasks\FilamentTasksPlugin;
 use Lightworx\FilamentTasks\Models\Task;
 use Lightworx\FilamentTasks\Resources\TaskResource\Pages;
 use Lightworx\FilamentTasks\Support\StatusHelper;
-use Lightworx\TasksApiClient\Facades\TasksApi;
+use Lightworx\FilamentTasks\Support\TaskCache;
 use Lightworx\TasksApiClient\TasksApiClient;
 
 class TaskResource extends Resource
@@ -47,10 +47,6 @@ class TaskResource extends Resource
     public static function getModelLabel(): string { return 'Task'; }
     public static function getPluralModelLabel(): string { return 'Tasks'; }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Route binding — return a shell Task; no DB lookup
-    // ──────────────────────────────────────────────────────────────────────
-
     public static function resolveRecordRouteBinding(int|string $key, ?Closure $modifyQuery = null): ?Model
     {
         $task = new Task();
@@ -58,10 +54,6 @@ class TaskResource extends Resource
         $task->exists = true;
         return $task;
     }
-
-    // ──────────────────────────────────────────────
-    // Form
-    // ──────────────────────────────────────────────
 
     public static function form(Schema $schema): Schema
     {
@@ -71,69 +63,54 @@ class TaskResource extends Resource
                 ->required()
                 ->maxLength(255)
                 ->columnSpanFull(),
-
             Textarea::make('description')
                 ->label('Description')
                 ->rows(3)
                 ->columnSpanFull(),
-
-            // Status: options AND the label for the current value both come
-            // from the API. getOptionLabelUsing() ensures the selected label
-            // is resolved even when options are loaded lazily.
             Select::make('status')
                 ->label('Status')
                 ->options(fn () => StatusHelper::options())
-                ->getOptionLabelUsing(fn (?string $value) => StatusHelper::label($value))
                 ->required(),
-
-            // Project: searchable Select with explicit label resolver so the
-            // current project name is shown rather than the raw id.
             Select::make('project_id')
                 ->label('Project')
                 ->options(fn () => StatusHelper::projectOptions())
                 ->getOptionLabelUsing(fn (?string $value) => StatusHelper::projectLabel($value))
                 ->searchable()
-                ->nullable(),
-
+                ->required(),
             TextInput::make('assigned_email')
                 ->label('Assigned To (email)')
                 ->email()
+                ->required()
                 ->maxLength(255),
-
             DateTimePicker::make('due_at')
                 ->label('Due At'),
         ]);
     }
 
-    // ──────────────────────────────────────────────
-    // Table
-    // ──────────────────────────────────────────────
-
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-
                 TextColumn::make('title')
                     ->label('Title')
                     ->searchable()
                     ->wrap(),
-
-                TextColumn::make('status')
+               TextColumn::make('status')
                     ->badge()
                     ->label('Status')
                     ->color(function ($state) { return Color::hex(StatusHelper::badgeColour($state)); })
                     ->formatStateUsing(fn (?string $state) => StatusHelper::label($state)),
-
                 TextColumn::make('project_id')
                     ->label('Project')
                     ->formatStateUsing(fn (?string $state) => StatusHelper::projectLabel($state)),
-
                 TextColumn::make('assigned_email')
                     ->label('Assigned To'),
-
                 TextColumn::make('due_at')
                     ->label('Due At')
+                    ->dateTime('d M Y H:i')
+                    ->sortable(),
+                TextColumn::make('created_at')
+                    ->label('Created At')
                     ->dateTime('d M Y H:i')
                     ->sortable(),
             ])
@@ -146,42 +123,32 @@ class TaskResource extends Resource
                     ->label('Complete')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(function (Task $record) {
-                        $completeId = static::completeStatusId();
-                        return $completeId && $record->status !== $completeId;
+                    ->visible(function ($record) {
+                        $doneLabel = static::doneStatusLabel();
+                        return $doneLabel && $record->status !== $doneLabel;
                     })
                     ->requiresConfirmation()
-                    ->action(function (Task $record) {
-                        $completeId = static::completeStatusId();
-                        if (! $completeId) {
-                            Notification::make()->title('No "completed" status found in API.')->warning()->send();
+                    ->action(function ($record) {
+                        $doneLabel = static::doneStatusLabel();
+                        if (! $doneLabel) {
+                            Notification::make()->title('No done status found in API.')->warning()->send();
                             return;
                         }
                         try {
                             app(TasksApiClient::class)
                                 ->tasks()
-                                ->update($record->id, ['status' => $completeId]);
-                            Notification::make()->title('Task marked as completed.')->success()->send();
+                                ->update($record->id, ['status' => $doneLabel]);
+                            TaskCache::flush();
+                            Notification::make()->title('Task marked as done.')->success()->send();
                         } catch (\Throwable $e) {
                             Notification::make()->title('Failed: ' . $e->getMessage())->danger()->send();
                         }
                     }),
 
                 EditAction::make(),
-
                 Action::make('delete')
-                    ->label('Delete')
-                    ->icon('heroicon-o-trash')
-                    ->color('danger')
                     ->requiresConfirmation()
-                    ->action(function (Task $record) {
-                        try {
-                            app(TasksApiClient::class)->tasks()->delete($record->id);
-                            Notification::make()->title('Task deleted.')->success()->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()->title('Failed: ' . $e->getMessage())->danger()->send();
-                        }
-                    }),
+                    ->action(fn (Task $record) => $record->delete())
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -189,6 +156,7 @@ class TaskResource extends Resource
                         ->action(function (\Illuminate\Support\Collection $records) {
                             $tasks = app(TasksApiClient::class)->tasks();
                             $records->each(fn (Task $r) => $tasks->delete($r->id));
+                            TaskCache::flush();
                             Notification::make()->title('Selected tasks deleted.')->success()->send();
                         }),
                 ]),
@@ -196,10 +164,29 @@ class TaskResource extends Resource
             ->poll('30s');
     }
 
-    protected static function completeStatusId(): ?string
+    /**
+     * Find the status label that represents "done" — the last active status
+     * by sort_order, which is the natural end state in most workflows.
+     * Falls back to searching for labels containing "done" or "complet".
+     */
+    protected static function doneStatusLabel(): ?string
     {
-        return collect(StatusHelper::all())
-            ->first(fn ($s) => str_contains(strtolower($s['label'] ?? ''), 'complet'))['id'] ?? null;
+        $statuses = collect(StatusHelper::all())
+            ->filter(fn ($s) => ($s['is_active'] ?? true))
+            ->sortBy('sort_order');
+
+        // Try label match first
+        $match = $statuses->first(
+            fn ($s) => str_contains(strtolower($s['label']), 'done')
+                || str_contains(strtolower($s['label']), 'complet')
+        );
+
+        if ($match) {
+            return $match['label'];
+        }
+
+        // Fall back to the last status by sort_order
+        return $statuses->last()['label'] ?? null;
     }
 
     public static function getRecordRouteKeyName(): ?string { return 'id'; }

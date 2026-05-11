@@ -1,48 +1,40 @@
 <?php
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Tasks API Base URL
-    |--------------------------------------------------------------------------
-    |
-    | The base URL for your remote Tasks API.
-    | Set TASKS_API_URL in your .env (no trailing slash).
-    | Example: TASKS_API_URL=https://tasks.lightworx.co.za
-    |
-    */
     'base_url' => env('TASKS_API_URL', 'http://localhost:8000'),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Client Credentials
-    |--------------------------------------------------------------------------
-    |
-    | The client ID and secret issued by the Tasks API for your application.
-    | These are passed to the tasks-api-client SDK.
-    |
-    | Set in .env:
-    |   TASKS_API_CLIENT_ID=cli_xxx
-    |   TASKS_API_CLIENT_SECRET=xxx
-    |
-    */
     'client_id'     => env('TASKS_API_CLIENT_ID', ''),
     'client_secret' => env('TASKS_API_CLIENT_SECRET', ''),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Navigation Group
-    |--------------------------------------------------------------------------
-    |
-    | The navigation group label shown in the Filament sidebar.
-    |
-    */
     'navigation_group' => env('TASKS_NAV_GROUP', 'Task Management'),
+    'navigation_sort'  => 10,
 
     /*
     |--------------------------------------------------------------------------
-    | Navigation Sort Order
+    | Assigned Email Scope
     |--------------------------------------------------------------------------
+    |
+    | If your API client does NOT have can_view_all_tasks permission, all task
+    | queries must include an assigned_email or the API returns nothing.
+    |
+    | Set TASKS_API_ASSIGNED_EMAIL in your .env to scope all plugin queries
+    | to a specific assignee. Leave empty if your client has can_view_all_tasks.
+    |
+    | Example: TASKS_API_ASSIGNED_EMAIL=person@example.com
+    |
     */
-    'navigation_sort' => 10,
+    'assigned_email' => env('TASKS_API_ASSIGNED_EMAIL', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Owner Email (private project visibility)
+    |--------------------------------------------------------------------------
+    |
+    | Set TASKS_API_OWNER_EMAIL to unlock visibility of private projects owned
+    | by that email address (requires can_lookup_assigned_tasks on the client).
+    |
+    | Example: TASKS_API_OWNER_EMAIL=owner@example.com
+    |
+    */
+    'owner_email' => env('TASKS_API_OWNER_EMAIL', ''),
 ];

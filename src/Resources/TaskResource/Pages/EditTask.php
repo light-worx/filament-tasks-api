@@ -7,6 +7,7 @@ use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Lightworx\FilamentTasks\Models\Task;
 use Lightworx\FilamentTasks\Resources\TaskResource;
+use Lightworx\FilamentTasks\Support\TaskCache;
 use Lightworx\TasksApiClient\Facades\TasksApi;
 
 class EditTask extends EditRecord
@@ -16,7 +17,6 @@ class EditTask extends EditRecord
     protected function resolveRecord(int|string $key): Task
     {
         try {
-            // SDK now has find() — no need to fetch all tasks
             $dto = TasksApi::tasks()->find((string) $key);
             if ($dto) {
                 return Task::fromDto($dto);
@@ -37,8 +37,9 @@ class EditTask extends EditRecord
     protected function handleRecordUpdate(Model $record, array $data): Task
     {
         try {
-            $dto = TasksApi::tasks()->update($record->id, $data);
-            return Task::fromDto($dto);
+            $task = Task::fromDto(TasksApi::tasks()->update($record->id, $data));
+            TaskCache::flush();
+            return $task;
         } catch (\Throwable $e) {
             Notification::make()
                 ->title('Failed to update task: ' . $e->getMessage())
