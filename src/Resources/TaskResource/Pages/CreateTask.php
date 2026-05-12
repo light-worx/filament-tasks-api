@@ -15,17 +15,9 @@ class CreateTask extends CreateRecord
 
     protected function handleRecordCreation(array $data): Task
     {
-        try {
-            $task = Task::fromDto(TasksApi::tasks()->create($data));
-            TaskCache::flush();
-            return $task;
-        } catch (\Throwable $e) {
-            Notification::make()
-                ->title('Failed to create task: ' . $e->getMessage())
-                ->danger()
-                ->send();
-            $this->halt();
-        }
+        $dto = TasksApi::tasks()->create($data);
+        TaskCache::flush();
+        return Task::fromDto($dto);
     }
 
     protected function getRedirectUrl(): string

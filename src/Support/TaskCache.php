@@ -11,15 +11,35 @@ class TaskCache
     protected static int $ttl = 300; // 5 minutes
 
     // ──────────────────────────────────────────────
-    // Cache keys
+    // Version — incrementing invalidates all task cache keys
+    // ──────────────────────────────────────────────
+
+    protected static function version(): int
+    {
+        // If the key does not exist, seed it at 0 so the first flush increments to 1
+        if (! Cache::has("filament_tasks:version")) {
+            Cache::put("filament_tasks:version", 0);
+        }
+        return (int) Cache::get("filament_tasks:version", 0);
+    }
+
+    public static function flush(): void
+    {
+        Cache::increment('filament_tasks:version');
+    }
+
+    // ──────────────────────────────────────────────
+    // Cache keys — include version so flush works
     // ──────────────────────────────────────────────
 
     public static function tasksKey(int $page, int $perPage, ?string $status): string
     {
         $plugin = FilamentTasksPlugin::get();
+        $v      = static::version();
+
         return implode(':', array_filter([
             'filament_tasks',
-            'list',
+            "v{$v}",
             $plugin->getAssignedEmail() ?? 'all',
             $status ?? 'any',
             "p{$page}",
@@ -30,11 +50,13 @@ class TaskCache
     public static function statsKey(): string
     {
         $plugin = FilamentTasksPlugin::get();
-        return 'filament_tasks:stats:' . ($plugin->getAssignedEmail() ?? 'all');
+        $v      = static::version();
+
+        return "filament_tasks:v{$v}:stats:" . ($plugin->getAssignedEmail() ?? 'all');
     }
 
     // ──────────────────────────────────────────────
-    // Fetchers — return cached data or fetch & store
+    // Fetchers
     // ──────────────────────────────────────────────
 
     public static function tasks(int $page, int $perPage, ?string $status = null): array
@@ -56,13 +78,12 @@ class TaskCache
     }
 
     // ──────────────────────────────────────────────
-    // Force refresh — clears matching keys and re-fetches
+    // Force refresh
     // ──────────────────────────────────────────────
 
     public static function refreshTasks(int $page, int $perPage, ?string $status = null): array
     {
-        $key = static::tasksKey($page, $perPage, $status);
-        Cache::forget($key);
+        $key   = static::tasksKey($page, $perPage, $status);
         $fresh = static::fetchTasks($page, $perPage, $status);
         Cache::put($key, $fresh, static::$ttl);
         return $fresh;
@@ -70,23 +91,10 @@ class TaskCache
 
     public static function refreshStats(): array
     {
-        $key = static::statsKey();
-        Cache::forget($key);
+        $key   = static::statsKey();
         $fresh = static::fetchStats();
         Cache::put($key, $fresh, static::$ttl);
         return $fresh;
-    }
-
-    /**
-     * Clear all filament_tasks:* keys.
-     * Called after create/update/delete so stale data isn't served.
-     */
-    public static function flush(): void
-    {
-        // Laravel cache doesn't support wildcard deletes on all drivers,
-        // so we use a version key approach — bumping it invalidates all
-        // filament_tasks keys that include the version.
-        Cache::increment('filament_tasks:version');
     }
 
     // ──────────────────────────────────────────────

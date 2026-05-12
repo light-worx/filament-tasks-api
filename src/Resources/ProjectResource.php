@@ -4,20 +4,15 @@ namespace Lightworx\FilamentTasks\Resources;
 
 use BackedEnum;
 use Closure;
-use Filament\Actions\Action;
-use Filament\Actions\EditAction;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Lightworx\FilamentTasks\FilamentTasksPlugin;
 use Lightworx\FilamentTasks\Models\Project;
 use Lightworx\FilamentTasks\Resources\ProjectResource\Pages;
-use Lightworx\TasksApiClient\Facades\TasksApi;
+use Lightworx\FilamentTasks\Resources\ProjectResource\Schemas\ProjectForm;
+use Lightworx\FilamentTasks\Resources\ProjectResource\Tables\ProjectsTable;
 
 class ProjectResource extends Resource
 {
@@ -49,59 +44,12 @@ class ProjectResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->schema([
-            TextInput::make('name')
-                ->label('Name')
-                ->required()
-                ->maxLength(255)
-                ->columnSpanFull(),
-
-            Textarea::make('description')
-                ->label('Description')
-                ->rows(3)
-                ->columnSpanFull(),
-        ]);
+        return ProjectForm::configure($schema);
     }
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                TextColumn::make('id')
-                    ->label('ID')
-                    ->width('80px')
-                    ->copyable(),
-
-                TextColumn::make('name')
-                    ->label('Name')
-                    ->searchable(),
-
-                TextColumn::make('description')
-                    ->label('Description')
-                    ->limit(60)
-                    ->wrap(),
-
-                TextColumn::make('created_at')
-                    ->label('Created')
-                    ->dateTime('d M Y'),
-            ])
-            ->recordActions([
-                EditAction::make(),
-
-                Action::make('delete')
-                    ->label('Delete')
-                    ->icon('heroicon-o-trash')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->action(function (Project $record) {
-                        try {
-                            TasksApi::projects()->delete($record->id);
-                            Notification::make()->title('Project deleted.')->success()->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()->title('Failed: ' . $e->getMessage())->danger()->send();
-                        }
-                    }),
-            ]);
+        return ProjectsTable::configure($table);
     }
 
     public static function getRecordRouteKeyName(): ?string { return 'id'; }
