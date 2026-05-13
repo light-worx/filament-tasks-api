@@ -3,6 +3,7 @@
 namespace Lightworx\FilamentTasks;
 
 use Illuminate\Support\ServiceProvider;
+use Lightworx\TasksApiClient\DTO\TaskData;
 
 class FilamentTasksServiceProvider extends ServiceProvider
 {
@@ -19,7 +20,7 @@ class FilamentTasksServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../config/filament-tasks.php' => config_path('filament-tasks.php'),
         ], 'filament-tasks-config');
-
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'filament-tasks');
+        class_exists(TaskData::class);
     }
 }
