@@ -17,6 +17,7 @@ use Lightworx\FilamentTasks\Models\Task;
 use Lightworx\FilamentTasks\Resources\TaskResource;
 use Lightworx\FilamentTasks\Support\StatusHelper;
 use Lightworx\FilamentTasks\Support\TaskCache;
+use Lightworx\TasksApiClient\DTO\TaskData;
 use Lightworx\TasksApiClient\Facades\TasksApi;
 
 class ListTasks extends ListRecords
@@ -77,7 +78,7 @@ class ListTasks extends ListRecords
             return $this->apiPaginator;
         }
 
-        $items = collect($result['data'])->map(fn ($dto) => Task::fromDto($dto));
+        $items = collect($result['data'])->map(fn (TaskData $dto) => Task::fromDto($dto));
         $meta  = $result['meta'] ?? [];
 
         $this->apiPaginator = new LengthAwarePaginator(
