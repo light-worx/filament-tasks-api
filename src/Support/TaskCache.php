@@ -11,16 +11,15 @@ class TaskCache
     protected static int $ttl = 300; // 5 minutes
 
     // ──────────────────────────────────────────────
-    // Version — incrementing invalidates all task cache keys
+    // Version
     // ──────────────────────────────────────────────
 
     protected static function version(): int
     {
-        // If the key does not exist, seed it at 0 so the first flush increments to 1
-        if (! Cache::has("filament_tasks:version")) {
-            Cache::put("filament_tasks:version", 0);
+        if (! Cache::has('filament_tasks:version')) {
+            Cache::put('filament_tasks:version', 0);
         }
-        return (int) Cache::get("filament_tasks:version", 0);
+        return (int) Cache::get('filament_tasks:version', 0);
     }
 
     public static function flush(): void
@@ -29,7 +28,7 @@ class TaskCache
     }
 
     // ──────────────────────────────────────────────
-    // Cache keys — include version so flush works
+    // Cache keys
     // ──────────────────────────────────────────────
 
     public static function tasksKey(int $page, int $perPage, ?string $status): string
@@ -56,7 +55,7 @@ class TaskCache
     }
 
     // ──────────────────────────────────────────────
-    // Fetchers
+    // Fetchers — store plain arrays, never PHP objects
     // ──────────────────────────────────────────────
 
     public static function tasks(int $page, int $perPage, ?string $status = null): array
@@ -98,7 +97,7 @@ class TaskCache
     }
 
     // ──────────────────────────────────────────────
-    // Internal fetchers
+    // Internal fetchers — convert DTOs to plain arrays before caching
     // ──────────────────────────────────────────────
 
     protected static function fetchTasks(int $page, int $perPage, ?string $status): array
@@ -116,7 +115,25 @@ class TaskCache
             $query->whereStatus($status);
         }
 
-        return $query->paginate($perPage);
+        $result = $query->paginate($perPage);
+
+        // Convert TaskData DTOs to plain arrays so the cache stores only
+        // serializable primitives — no __PHP_Incomplete_Class on retrieval.
+        return [
+            'data' => array_map(
+                fn ($dto) => [
+                    'id'             => $dto->id,
+                    'title'          => $dto->title,
+                    'description'    => $dto->description,
+                    'assigned_email' => $dto->assigned_email,
+                    'status'         => $dto->status,
+                    'project_id'     => $dto->project_id,
+                    'due_at'         => $dto->due_at,
+                ],
+                $result['data']
+            ),
+            'meta' => $result['meta'],
+        ];
     }
 
     protected static function fetchStats(): array
@@ -131,6 +148,18 @@ class TaskCache
             $query->ownerEmail($ownerEmail);
         }
 
-        return $query->get();
+        // Convert DTOs to plain arrays
+        return array_map(
+            fn ($dto) => [
+                'id'             => $dto->id,
+                'title'          => $dto->title,
+                'description'    => $dto->description,
+                'assigned_email' => $dto->assigned_email,
+                'status'         => $dto->status,
+                'project_id'     => $dto->project_id,
+                'due_at'         => $dto->due_at,
+            ],
+            $query->get()
+        );
     }
 }
