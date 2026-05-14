@@ -6,20 +6,11 @@ use Illuminate\Support\Facades\Cache;
 
 class AssigneeResolver
 {
-    /**
-     * Whether the assignee model is configured.
-     */
     public static function isConfigured(): bool
     {
         return filled(config('filament-tasks.assignee_model'));
     }
 
-    /**
-     * Returns options for a Select input keyed by email, labelled by name.
-     * ['john@example.com' => 'John Smith', ...]
-     *
-     * Cached for 5 minutes since the local model list rarely changes.
-     */
     public static function options(): array
     {
         if (! static::isConfigured()) {
@@ -30,11 +21,28 @@ class AssigneeResolver
             $model      = config('filament-tasks.assignee_model');
             $labelField = config('filament-tasks.assignee_label_field', 'name');
             $emailField = config('filament-tasks.assignee_email_field', 'email');
-            $orderBy    = config('filament-tasks.assignee_order_by') ?? $labelField;
+            $orderBy    = config('filament-tasks.assignee_order_by') ?? null;
 
-            return $model::query()
-                ->orderBy($orderBy)
-                ->get([$emailField, $labelField])
+            $query = $model::query();
+
+            $instance      = new $model();
+            $realColumns   = $instance->getFillable();
+            $orderByField  = $orderBy ?? $labelField;
+            $orderInSql    = in_array($orderByField, $realColumns);
+
+            if ($orderInSql) {
+                $query->orderBy($orderByField);
+            }
+
+            // Fetch all columns so accessors work correctly
+            $records = $query->get();
+
+            // Sort in PHP if the order field is an accessor
+            if (! $orderInSql) {
+                $records = $records->sortBy(fn ($r) => $r->{$orderByField});
+            }
+
+            return $records
                 ->mapWithKeys(fn ($record) => [
                     $record->{$emailField} => $record->{$labelField},
                 ])
@@ -44,7 +52,6 @@ class AssigneeResolver
 
     /**
      * Returns the display label for a given email address.
-     * Falls back to the email itself if not found.
      */
     public static function labelForEmail(?string $email): string
     {
@@ -55,7 +62,7 @@ class AssigneeResolver
     }
 
     /**
-     * Flush the assignee options cache (e.g. after the local model changes).
+     * Flush the assignee options cache.
      */
     public static function flush(): void
     {
