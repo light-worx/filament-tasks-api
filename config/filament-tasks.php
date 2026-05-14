@@ -37,4 +37,33 @@ return [
     |
     */
     'owner_email' => env('TASKS_API_OWNER_EMAIL', ''),
+
+     /*
+    |--------------------------------------------------------------------------
+    | Assignee Model
+    |--------------------------------------------------------------------------
+    | Optional. If set, the "Assigned To" field on the task form becomes a
+    | searchable Select populated from this Eloquent model rather than a
+    | plain email text input.
+    |
+    | assignee_model       - Fully-qualified model class name
+    | assignee_label_field - The field shown as the option label in the dropdown
+    | assignee_email_field - The field whose value is stored as assigned_email
+    | assignee_order_by    - Field to order the dropdown by (default: label field)
+    |
+    | Example:
+    |   'assignee_model'       => App\Models\Individual::class,
+    |   'assignee_label_field' => 'name',
+    |   'assignee_email_field' => 'email',
+    |   'assignee_order_by'    => 'name',
+    |
+    | Or set via .env:
+    |   TASKS_ASSIGNEE_MODEL=App\Models\Individual
+    |   TASKS_ASSIGNEE_LABEL=name
+    |   TASKS_ASSIGNEE_EMAIL=email
+    */
+    'assignee_model'       => env('TASKS_ASSIGNEE_MODEL', null),
+    'assignee_label_field' => env('TASKS_ASSIGNEE_LABEL', 'name'),
+    'assignee_email_field' => env('TASKS_ASSIGNEE_EMAIL', 'email'),
+    'assignee_order_by'    => env('TASKS_ASSIGNEE_ORDER_BY', null), // defaults to label field
 ];

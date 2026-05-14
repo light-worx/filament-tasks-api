@@ -9,6 +9,7 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Lightworx\FilamentTasks\Support\AssigneeResolver;
 use Lightworx\FilamentTasks\Support\StatusHelper;
 
 class TasksTable
@@ -38,7 +39,11 @@ class TasksTable
                     ->formatStateUsing(fn (?string $state) => StatusHelper::projectLabel($state)),
 
                 TextColumn::make('assigned_email')
-                    ->label('Assigned To'),
+                    ->label('Assigned To')
+                    ->formatStateUsing(fn (?string $state) => AssigneeResolver::isConfigured()
+                        ? AssigneeResolver::labelForEmail($state)
+                        : ($state ?? '—')
+                    ),
 
                 TextColumn::make('due_at')
                     ->label('Due At')

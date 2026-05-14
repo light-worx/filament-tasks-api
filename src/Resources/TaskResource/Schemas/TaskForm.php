@@ -7,6 +7,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Lightworx\FilamentTasks\Support\AssigneeResolver;
 use Lightworx\FilamentTasks\Support\StatusHelper;
 
 class TaskForm
@@ -37,11 +38,18 @@ class TaskForm
                 ->searchable()
                 ->required(),
 
-            TextInput::make('assigned_email')
-                ->label('Assigned To (email)')
-                ->email()
-                ->required()
-                ->maxLength(255),
+            AssigneeResolver::isConfigured()
+                ? Select::make('assigned_email')
+                    ->label('Assigned To')
+                    ->options(fn () => AssigneeResolver::options())
+                    ->getOptionLabelUsing(fn (?string $value) => AssigneeResolver::labelForEmail($value))
+                    ->searchable()
+                    ->required()
+                : TextInput::make('assigned_email')
+                    ->label('Assigned To (email)')
+                    ->email()
+                    ->required()
+                    ->maxLength(255),
 
             DateTimePicker::make('due_at')
                 ->label('Due At'),
