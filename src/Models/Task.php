@@ -54,6 +54,9 @@ class Task extends Model implements Wireable
         return $instance;
     }
 
+    /**
+     * Hydrate from a TaskData DTO.
+     */
     public static function fromDto(TaskData $dto): static
     {
         $instance = new static();
@@ -65,6 +68,37 @@ class Task extends Model implements Wireable
             'status'         => $dto->status,
             'project_id'     => $dto->project_id,
             'due_at'         => $dto->due_at,
+        ]);
+        $instance->exists = true;
+        return $instance;
+    }
+
+    /**
+     * Hydrate from a plain array (used when cache returns arrays not DTOs).
+     */
+    /**
+     * Hydrate from either a TaskData DTO or a plain array.
+     * Used by ListTasks which may receive either depending on cache state.
+     */
+    public static function fromItem(mixed $item): static
+    {
+        if ($item instanceof \Lightworx\TasksApiClient\DTO\TaskData) {
+            return static::fromDto($item);
+        }
+        return static::fromArray((array) $item);
+    }
+
+    public static function fromArray(array $data): static
+    {
+        $instance = new static();
+        $instance->forceFill([
+            'id'             => $data['id'] ?? null,
+            'title'          => $data['title'] ?? null,
+            'description'    => $data['description'] ?? null,
+            'assigned_email' => $data['assigned_email'] ?? null,
+            'status'         => $data['status'] ?? null,
+            'project_id'     => $data['project_id'] ?? null,
+            'due_at'         => $data['due_at'] ?? null,
         ]);
         $instance->exists = true;
         return $instance;

@@ -77,7 +77,7 @@ class ListTasks extends ListRecords
             return $this->apiPaginator;
         }
 
-        $items = collect($result['data'])->map(fn ($dto) => Task::fromDto($dto));
+        $items = collect($result['data'])->map(fn ($item) => Task::fromItem($item));
         $meta  = $result['meta'] ?? [];
 
         $this->apiPaginator = new LengthAwarePaginator(
